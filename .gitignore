@@ -1,0 +1,4 @@
+node_modules
+dist
+# fotos y planos del local: no se publican (el repo es público)
+recursos/
