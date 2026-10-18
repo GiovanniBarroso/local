@@ -22,7 +22,7 @@ npm run dev      # http://localhost:5173
 npm run deploy   # compila y publica en https://giovannibarroso.github.io/local/
 ```
 
-`npm run deploy` sube la web compilada a la rama `gh-pages`, que es la que sirve GitHub Pages. El código fuente va en `master` con un `git push` normal.
+`npm run deploy` sube la web compilada a la rama `gh-pages`, que es la que sirve GitHub Pages. El código fuente va en `master` con un `git push` normal, y cada push a `master` publica la web sola (workflow [publicar.yml](.github/workflows/publicar.yml)), así que `npm run deploy` solo hace falta para publicar a mano.
 
 ## Dónde se cambian las cosas
 
