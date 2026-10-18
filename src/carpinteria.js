@@ -120,11 +120,24 @@ export function rejilla(o, zInt, zExt, m) {
 // Puerta interior: cerco y hoja lisa abatida hacia dentro ("abierta" en grados).
 // El tabique es simétrico (z de -e/2 a e/2); la hoja gira sobre la jamba izquierda
 // o, con bisagra: 'derecha', sobre la derecha (mirando el tabique desde su arranque).
+// Con corredera: { hacia, cara }, la hoja corre abierta por fuera del tabique, sobre su
+// cara z > 0 (cara: 1) o z < 0 (cara: -1), hacia el arranque (hacia: -1) o el final (1).
 export function puertaInterior(o, e, m, abierta = 80) {
   const g = new THREE.Group()
   const x0 = o.desde, x1 = o.desde + o.ancho, y0 = o.antepecho ?? 0, y1 = y0 + o.alto
   const a = 0.04
   g.add(malla([...marco(x0, x1, y0 - 0.001, y1, a, -e / 2 - 0.01, e / 2 + 0.01)].slice(0, 3), m.cerco))
+  if (o.corredera) {
+    const { hacia = -1, cara = 1 } = o.corredera
+    const ancho = x1 - x0 + 0.06, z = cara * (e / 2 + 0.035)
+    const h0 = hacia < 0 ? x0 + 0.04 - ancho : x1 - 0.04 // la hoja abierta tapa 4 cm del hueco
+    g.add(malla(caja(h0, h0 + ancho, y0 + 0.01, y1 + 0.02, z - 0.02, z + 0.02), m.hoja))
+    // guía sobre el hueco y la hoja, y tirador vertical en el canto que queda junto al hueco
+    g.add(malla(caja(Math.min(h0, x0), Math.max(h0 + ancho, x1), y1 + 0.02, y1 + 0.07, z - 0.03, z + 0.03), m.aluminio))
+    const xt = hacia < 0 ? h0 + ancho - 0.06 : h0 + 0.06
+    g.add(malla(caja(xt - 0.012, xt + 0.012, y0 + 0.8, y0 + 1.2, z + cara * 0.02, z + cara * 0.04), m.laton))
+    return g
+  }
   const lado = o.bisagra === 'derecha' ? -1 : 1 // hacia dónde va la hoja desde la bisagra
   const hoja = new THREE.Group()
   hoja.position.set(lado > 0 ? x0 + a : x1 - a, 0, 0)

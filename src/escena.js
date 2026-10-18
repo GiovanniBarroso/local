@@ -240,10 +240,11 @@ function repartir(a, b, maximo) {
 }
 
 // Estructura de acero bajo una tarima: pilares con placa de anclaje, vigas
-// paralelas a la fachada y viguetas hacia el fondo. Encima, tablero + acabado (6 cm).
-function estructuraTarima({ cota, poligono, separacionPilares = 2.2, separacionViguetas = 0.6 }, local, m) {
+// paralelas a la fachada (de canto "cantoViga") y viguetas hacia el fondo.
+// Encima, tablero + acabado (6 cm).
+function estructuraTarima({ cota, poligono, separacionPilares = 2.2, separacionViguetas = 0.6, cantoViga = 0.16 }, local, m) {
   const { minX, minY, maxX, maxY } = limites(poligono)
-  const topVigueta = cota - 0.06, topViga = topVigueta - 0.12, pieViga = topViga - 0.16
+  const topVigueta = cota - 0.06, topViga = topVigueta - 0.12, pieViga = topViga - cantoViga
   const piezas = []
   const filas = repartir(minY + 0.2, maxY - 0.2, separacionPilares)
   const columnas = repartir(minX + 0.35, maxX - 0.35, separacionPilares)
@@ -446,8 +447,9 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     }
   }
 
-  // Altillo en el almacén: forjado metálico con su estructura, barandilla y escala.
-  // No es suelo para el recorrido (solo se sube por la escala): cuenta como obstáculo.
+  // Altillo en el almacén: forjado metálico con su estructura, barandilla y escala o
+  // escalera. No es suelo para el recorrido (no cabe una persona de pie bajo el falso
+  // techo): todo cuenta como obstáculo.
   if (propuesta?.altillo) {
     const a = propuesta.altillo
     const forjadoAltillo = sombras(losa(a.poligono, 0.06, m.tablero))
@@ -455,6 +457,7 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     const piezas = [estructuraTarima(a, local, m), forjadoAltillo]
     if (a.barandilla) piezas.push(barandilla(a.barandilla, a.cota, m))
     if (a.escala) piezas.push(escala(a.escala, a.cota, m))
+    if (a.escalera) piezas.push(construirEscalera(a.escalera, a.cota, local, m).objeto)
     escena.add(...piezas)
     obstaculos.push(...piezas)
   }

@@ -169,12 +169,42 @@ const tipos = {
     )
   },
 
-  lavabo({ ancho = 0.6 }) {
+  // lavabo con pie o, con pie: false, volado (deja libre el hueco inferior, accesible)
+  lavabo({ ancho = 0.6, pie = true }) {
     return grupo(
-      malla([caja(ancho, 0.14, 0.45, 0, 0.72), caja(0.22, 0.72, 0.18, 0, 0, -0.12)], mat('#f4f3ef', 0.2)),
+      malla([caja(ancho, 0.14, 0.45, 0, 0.72), ...(pie ? [caja(0.22, 0.72, 0.18, 0, 0, -0.12)] : [])], mat('#f4f3ef', 0.2)),
       malla([cilindro(0.015, 0.015, 0.18, 0, 0.86, -0.15, 12), caja(0.03, 0.02, 0.14, 0, 1.02, -0.09)], mat('#c9c9c9', 0.15, 1)),
       malla(caja(ancho, 0.8, 0.01, 0, 1.05, -0.22), mat('#e8eef0', 0.03, 1)),
     )
+  },
+
+  // barras de apoyo a los lados del inodoro (separadas 0,70 m): la del lado de la
+  // transferencia (derecha) es abatible y se dibuja levantada
+  barrasApoyo({ altura = 0.75, largo = 0.7 }) {
+    const acero = mat('#c9c9c9', 0.25, 1), r = 0.017, pared = -0.3
+    const horizontal = (x) => new THREE.CylinderGeometry(r, r, largo, 12).rotateX(Math.PI / 2).translate(x, altura, pared + largo / 2)
+    return grupo(
+      malla(
+        [
+          horizontal(-0.35),
+          new THREE.CylinderGeometry(r, r, 0.2, 12).translate(-0.35, altura - 0.1, pared + largo - 0.02), // pata al suelo
+          new THREE.CylinderGeometry(r, r, largo, 12).translate(0.35, altura + largo / 2, pared + 0.08), // abatible, subida
+          caja(0.08, 0.14, 0.03, 0.35, altura - 0.07, pared + 0.015),
+        ],
+        acero,
+      ),
+    )
+  },
+
+  // círculo de giro de Ø 1,50 m (silla de ruedas), dibujado en el suelo
+  giro({ diametro = 1.5 }) {
+    const r = diametro / 2
+    const disco = new THREE.Mesh(
+      new THREE.CircleGeometry(r, 48).rotateX(-Math.PI / 2).translate(0, 0.004, 0),
+      new THREE.MeshBasicMaterial({ color: '#4f8fd6', transparent: true, opacity: 0.12, depthWrite: false }),
+    )
+    const borde = new THREE.Mesh(new THREE.RingGeometry(r - 0.02, r, 64).rotateX(-Math.PI / 2).translate(0, 0.005, 0), new THREE.MeshBasicMaterial({ color: '#4f8fd6' }))
+    return grupo(disco, borde)
   },
 
   colgante({ altura = 2.0, color = METAL }, { techo }) {
@@ -281,7 +311,7 @@ function objetosEnBaldas(ancho, fondo, alturas, e, semilla) {
 
 // Lo que se cuelga del techo: se oculta junto con él en maqueta y planta.
 export const DEL_TECHO = new Set(['colgante', 'bombilla'])
-export const SIN_COLISION = new Set(['alfombra', 'colgante', 'bombilla', 'enchufe', 'tomaAgua', 'cuadroNuevo', 'emergencia'])
+export const SIN_COLISION = new Set(['alfombra', 'colgante', 'bombilla', 'enchufe', 'tomaAgua', 'cuadroNuevo', 'emergencia', 'giro'])
 
 export function crearMueble(def, contexto) {
   const constructor = tipos[def.tipo]

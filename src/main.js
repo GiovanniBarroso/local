@@ -6,13 +6,14 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { local } from './data/local.js'
 import { propuesta } from './data/propuesta.js'
+import { modelo } from './data/modelo.js'
 import { construirEscena } from './escena.js'
 import { construirCotas, construirZonas, actualizarCotas, actualizarZonas } from './cotas.js'
 import { Recorrido } from './recorrido.js'
 import { aMundo, aPlanta, muros, limites, dentro, distanciaAlBorde, superficieUtil, formato, falsoTecho } from './geometria.js'
 
 const FONDO = new THREE.Color('#e7e4de')
-const MODOS = ['actual', 'propuesta', 'comparar']
+const MODOS = ['actual', 'propuesta', 'modelo', 'comparar']
 const VISTAS = ['maqueta', 'planta', 'recorrido']
 const AYUDA = {
   maqueta: 'Arrastra para girar · rueda para acercar · clic derecho o dos dedos para desplazar',
@@ -51,18 +52,21 @@ const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy())
 const escenas = {
   actual: construirEscena({ local, entorno, aniso }),
   propuesta: construirEscena({ local, propuesta, entorno, aniso }),
+  modelo: construirEscena({ local, propuesta: modelo, entorno, aniso }),
 }
+const datos = { propuesta, modelo } // la reforma que se ve en cada modo (en comparar, la propuesta)
+const reforma = () => datos[estado.modo] ?? propuesta
 
 // Capa superpuesta común a las dos escenas: cotas, rótulos y marcador del recorrido
 const superpuesta = new THREE.Scene()
 const cotas = construirCotas(local)
-const zonas = construirZonas(propuesta)
+const zonas = { propuesta: construirZonas(propuesta), modelo: construirZonas(modelo) }
 const marcador = new THREE.Mesh(
   new THREE.RingGeometry(0.17, 0.22, 40).rotateX(-Math.PI / 2),
   new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -2 }),
 )
 marcador.visible = false
-superpuesta.add(cotas, zonas, marcador)
+superpuesta.add(cotas, zonas.propuesta, zonas.modelo, marcador)
 
 // Cámaras
 const lim = limites(local.planta)
@@ -142,7 +146,7 @@ function redimensionar() {
 
 // La escena con la que se interactúa en el recorrido (en comparar, la propuesta)
 function escenaInteractiva() {
-  return estado.modo === 'actual' ? escenas.actual : escenas.propuesta
+  return escenas[estado.modo] ?? escenas.propuesta
 }
 
 // Interfaz
@@ -162,10 +166,13 @@ function pintarFicha() {
     ['Acera sobre el suelo', `${aprox}+${formato(local.cotaCalle ?? 0)} m`],
   ]
   if (estado.modo !== 'actual') {
-    const t = propuesta.tarima?.cota ?? 0
-    filas.push(['Altura útil sobre tarima', `${aprox}${formato(falsoTecho(local, propuesta) - t)} m`])
+    const r = reforma(), t = r.tarima?.cota ?? 0
+    filas.push(['Altura útil sobre tarima', `${aprox}${formato(falsoTecho(local, r) - t)} m`])
   }
   $('#datos').innerHTML = filas.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')
+  const notas = estado.modo === 'modelo' ? modelo.notas ?? [] : []
+  $('#mejoras').hidden = !notas.length
+  $('#mejoras').innerHTML = notas.map((n) => `<li>${n}</li>`).join('')
 }
 
 function aplicar() {
@@ -180,12 +187,12 @@ function aplicar() {
   $('#btn-cotas').setAttribute('aria-pressed', estado.cotas)
   $('#btn-cotas').disabled = vista === 'recorrido'
   $('#btn-estructura').setAttribute('aria-pressed', estado.estructura)
-  $('#btn-estructura').disabled = vista === 'recorrido' || modo === 'actual' || !propuesta.tarima
+  $('#btn-estructura').disabled = vista === 'recorrido' || modo === 'actual' || !reforma().tarima
   $('#btn-techo').setAttribute('aria-pressed', estado.techo)
-  $('#btn-techo').disabled = vista === 'recorrido' || modo === 'actual' || !propuesta.techo
+  $('#btn-techo').disabled = vista === 'recorrido' || modo === 'actual' || !reforma().techo
   comparador.hidden = modo !== 'comparar'
   cotas.visible = estado.cotas && vista !== 'recorrido'
-  zonas.visible = cotas.visible && modo !== 'actual'
+  for (const [clave, grupo] of Object.entries(zonas)) grupo.visible = cotas.visible && clave === (modo === 'comparar' ? 'propuesta' : modo)
   $('#ayuda').textContent = AYUDA[vista]
   document.body.dataset.vista = vista
   pintarFicha()
@@ -239,7 +246,7 @@ function dibujar() {
   const camara = camaras[estado.vista]
   for (const e of Object.values(escenas)) e.aplicarVista(estado.vista, camara, { estructura: estado.estructura, techo: estado.techo })
   actualizarCotas(cotas, estado.vista, camara)
-  actualizarZonas(zonas, estado.modo === 'comparar' ? estado.corte : 0, camara)
+  for (const grupo of Object.values(zonas)) actualizarZonas(grupo, estado.modo === 'comparar' ? estado.corte : 0, camara)
   renderer.setScissorTest(true)
   if (estado.modo === 'comparar') {
     const x = Math.round(innerWidth * estado.corte)

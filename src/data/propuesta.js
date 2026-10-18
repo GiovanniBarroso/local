@@ -14,8 +14,9 @@
 //      a la derecha, rejillas de ventilación en los extremos y enfoscado pintado.
 //   7. Aseo en el fondo izquierdo de la tienda, sobre la tarima, con antesala
 //      (vestíbulo previo) hasta la bajante; el desagüe acomete a la bajante bajo la tarima.
-//   8. Enchufes en las dos medianeras y cuadro eléctrico nuevo en el machón central,
-//      a la derecha nada más entrar. Luces de emergencia en pared sobre las salidas.
+//   8. Medianeras de la tienda trasdosadas con panel, enrasado con los pilares, y los
+//      enchufes sobre el panel. Cuadro eléctrico nuevo en el machón central, a la
+//      derecha nada más entrar. Luces de emergencia en pared sobre las salidas.
 //   9. Altillo metálico a 2,50 m en la mitad izquierda del almacén, con escala.
 import { local } from './local.js'
 
@@ -30,6 +31,18 @@ const REJILLA = 0.25 // alto de las rejillas de ventilación
 // las rejillas, centradas en la franja alta de la fachada (entre los huecos y la coronación)
 const FRANJA = (HUECOS + local.alturaLibre) / 2 - REJILLA / 2
 const ALTILLO = { x0: 0, x1: ANCHO / 2, y0: FONDO, y1: 10.7, cota: 2.5 } // mitad izquierda del almacén
+// cara del trasdosado de las medianeras, a haces de los pilares intermedios (0,19 y 6,65)
+const TRASDOSADO = { izquierda: 0.2, derecha: 6.64 }
+
+// Medidas que reutiliza el modelo (data/modelo.js)
+export const medidas = { COTA, FONDO, ANCHO, ANTESALA, BAJANTE, ALTILLO }
+
+// Planta libre de la tienda, entre los trasdosados, sin el bloque de la antesala y el aseo
+// (que ocupa desde la medianera izquierda hasta x = bloque)
+export function tienda(bloque) {
+  const { izquierda: i, derecha: d } = TRASDOSADO
+  return [[i, 0], [d, 0], [d, FONDO - 0.1], [bloque, FONDO - 0.1], [bloque, ANTESALA.y0], [i, ANTESALA.y0]]
+}
 
 export const propuesta = {
   pleno: 0.4, // espacio bajo el forjado para instalaciones: el falso techo queda a alturaLibre - pleno
@@ -46,7 +59,7 @@ export const propuesta = {
       { muro: 0, tipo: 'ventana', desde: 5.1, ancho: 1.35, antepecho: COTA + 1.0, alto: 1.2 },
       { muro: 0, tipo: 'rejilla', desde: 0.35, ancho: 0.3, antepecho: FRANJA, alto: REJILLA },
       { muro: 0, tipo: 'celosia', desde: 0.7, ancho: 1.75, alto: 0.55, antepecho: 3.75 },
-      { muro: 0, tipo: 'celosia', desde: 3.5, ancho: 2.75, alto: 0.35, antepecho: 3.45 },
+      { muro: 0, tipo: 'celosia', desde: 3.5, ancho: 2.75, alto: 0.55, antepecho: 3.75 }, // alineada con la izquierda
       { muro: 0, tipo: 'rejilla', desde: 6.28, ancho: 0.3, antepecho: FRANJA, alto: REJILLA },
     ],
     // acabados sobre la cara exterior de la fachada
@@ -73,6 +86,9 @@ export const propuesta = {
   // 3. Pared panelada sobre el borde de la tarima, con el paso a la escalera.
   //    Arranca a la altura de la tarima: por debajo queda abierto el acceso
   //    desde el almacén al subsuelo bajo la tarima.
+  // 8. Trasdosado panelado de las medianeras de la tienda, desde la tarima hasta el falso
+  //    techo y enrasado con los pilares (los pilares y la bajante derecha quedan dentro).
+  //    Por la cámara que deja van las líneas de los enchufes.
   // 7. Tabiques de la antesala y del aseo (el fondo del aseo es el propio panelado).
   tabiques: [
     {
@@ -83,8 +99,11 @@ export const propuesta = {
       acabado: 'panelado',
       huecos: [{ desde: 5.7, ancho: 1.2, alto: 2.1 }],
     },
+    { de: [TRASDOSADO.izquierda / 2, 0], a: [TRASDOSADO.izquierda / 2, ANTESALA.y0], espesor: TRASDOSADO.izquierda, acabado: 'panelado' },
+    { de: [(TRASDOSADO.derecha + ANCHO) / 2, 0], a: [(TRASDOSADO.derecha + ANCHO) / 2, FONDO - 0.1], espesor: ANCHO - TRASDOSADO.derecha, acabado: 'panelado' },
     {
       // frente de la antesala, con su puerta hacia la tienda
+      grupo: 'aseo',
       de: [ANTESALA.x0, ANTESALA.y0 + 0.04],
       a: [ANTESALA.x1, ANTESALA.y0 + 0.04],
       espesor: 0.08,
@@ -93,6 +112,7 @@ export const propuesta = {
     },
     {
       // entre la antesala y el aseo
+      grupo: 'aseo',
       de: [ASEO.x0, ASEO.y0 + 0.04],
       a: [ASEO.x1, ASEO.y0 + 0.04],
       espesor: 0.08,
@@ -101,6 +121,7 @@ export const propuesta = {
     },
     {
       // lateral de la antesala y del aseo
+      grupo: 'aseo',
       de: [ASEO.x1 - 0.04, ANTESALA.y0],
       a: [ASEO.x1 - 0.04, ASEO.y1],
       espesor: 0.08,
@@ -147,32 +168,32 @@ export const propuesta = {
   },
 
   // 8. Instalación eléctrica: cuadro nuevo en la cara interior del machón central, a la
-  //    derecha nada más entrar; enchufes dobles a 0,30 m sobre la tarima en las medianeras.
+  //    derecha nada más entrar; enchufes dobles a 0,30 m sobre la tarima en el trasdosado.
   //    Luces de emergencia en pared sobre lo que hay que encontrar a oscuras: la puerta de
   //    la calle, el paso a la escalera y el pie de la escalera en el almacén.
   //    El cuadro de obra actual (medianera derecha) desaparece.
   quitar: ['cuadro'],
   mobiliario: [
     { tipo: 'cuadroNuevo', x: 2.98, y: 0.01, rot: 0, altura: 1.15 },
-    // medianera izquierda (x = 0) y derecha (x = 6,9)
+    // sobre el trasdosado de la medianera izquierda y de la derecha
     ...[1.25, 3.1, 5.1].flatMap((y) => [
-      { tipo: 'enchufe', x: 0.01, y, rot: 90, altura: 0.3 },
-      { tipo: 'enchufe', x: ANCHO - 0.01, y, rot: -90, altura: 0.3 },
+      { tipo: 'enchufe', x: TRASDOSADO.izquierda + 0.01, y, rot: 90, altura: 0.3 },
+      { tipo: 'enchufe', x: TRASDOSADO.derecha - 0.01, y, rot: -90, altura: 0.3 },
     ]),
     { tipo: 'emergencia', x: 1.125, y: 0.01, rot: 180, altura: 2.35 }, // sobre la puerta de entrada
     { tipo: 'emergencia', x: 6.3, y: FONDO - 0.11, rot: 0, altura: 2.25 }, // sobre el paso a la escalera
     { tipo: 'emergencia', x: 6.3, y: 10.69, rot: 0, altura: 2.3 }, // almacén, frente al pie de la escalera
     // 7. antesala: toma de agua junto a la bajante y lavabo en la misma medianera;
     //    aseo: inodoro contra el panelado
-    { tipo: 'tomaAgua', x: 0.01, y: BAJANTE.y + 0.22, rot: 90, altura: 0.5 },
-    { tipo: 'lavabo', x: 0.23, y: 6.15, rot: 90, ancho: 0.5 },
-    { tipo: 'inodoro', x: 0.45, y: ASEO.y1 - 0.3, rot: 0 },
+    { tipo: 'tomaAgua', x: 0.01, y: BAJANTE.y + 0.22, rot: 90, altura: 0.5, grupo: 'aseo' },
+    { tipo: 'lavabo', x: 0.23, y: 6.15, rot: 90, ancho: 0.5, grupo: 'aseo' },
+    { tipo: 'inodoro', x: 0.45, y: ASEO.y1 - 0.3, rot: 0, grupo: 'aseo' },
   ],
 
   // Rótulos de las zonas (superficie y nivel). "cota" y "rotulo" (dónde va el rótulo)
   // son opcionales: por defecto, el suelo y el centro de la zona.
   zonas: [
-    { nombre: 'Tienda', poligono: [[0, 0], [ANCHO, 0], [ANCHO, FONDO - 0.1], [ASEO.x1, FONDO - 0.1], [ASEO.x1, ANTESALA.y0], [0, ANTESALA.y0]] },
+    { nombre: 'Tienda', poligono: tienda(ASEO.x1) },
     { nombre: 'Antesala', poligono: [[ANTESALA.x0, ANTESALA.y0], [ANTESALA.x1, ANTESALA.y0], [ANTESALA.x1, ANTESALA.y1], [ANTESALA.x0, ANTESALA.y1]] },
     { nombre: 'Aseo', poligono: [[ASEO.x0, ASEO.y0], [ASEO.x1, ASEO.y0], [ASEO.x1, ASEO.y1], [ASEO.x0, ASEO.y1]] },
     { nombre: 'Almacén', poligono: [[0, FONDO], [ANCHO, FONDO], [ANCHO, 10.7], [0, 10.7]], rotulo: [4.6, FONDO + 1.25] },
