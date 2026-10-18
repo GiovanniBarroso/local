@@ -2,17 +2,17 @@
 
 Visor web (Three.js) para enseñar el local en su estado actual y con la reforma propuesta.
 
-- **Estado actual / Propuesta / Comparar**: el comparador parte la pantalla con un divisor arrastrable (antes | después) desde la misma cámara.
+- **Estado actual / Propuesta / Modelo / Comparar**: el modelo es la propuesta revisada tras estudiarla (aseo accesible, tarima con menos pilares, escalera de servicio al altillo); la ficha resume qué cambia. El comparador parte la pantalla con un divisor arrastrable (estado actual | propuesta) desde la misma cámara.
 - **Maqueta**: vista de pájaro sin techo. Los muros que tapan la cámara se recortan solos.
 - **Planta**: vista cenital ortogonal cortada a 1,10 m, con muros en relleno oscuro, cotas y superficies por zona.
 - **Recorrido**: a la altura de los ojos. Se arrastra para mirar, se hace clic en el suelo para ir y también se puede caminar con WASD o las flechas.
-- **Estructura**: en la propuesta, oculta el tablero de la tarima para ver la estructura metálica (pilares, vigas y viguetas). En planta queda como un plano de estructura.
-- **Techo**: en la propuesta, muestra el plano de techo (falso techo panelado con las tiras LED, el cassette de aire acondicionado, las luces de emergencia y la regleta del almacén) visto desde arriba, en maqueta y en planta. En el recorrido el techo se ve siempre.
+- **Estructura**: en la propuesta, oculta el tablero de la tarima para ver la estructura metálica (pilares, vigas y viguetas) y el saneamiento del aseo, que acomete a la bajante por debajo. En planta queda como un plano de estructura.
+- **Techo**: en la propuesta, muestra el plano de techo en maqueta y en planta: el falso techo translúcido con lo que cuelga debajo (tiras LED, cassette de aire acondicionado y regletas del almacén), visto por su cara inferior. En el recorrido el techo se ve siempre.
 - **Captura**: descarga un PNG de lo que se ve.
 
-En el recorrido se camina por los dos niveles: tarima (a cota de calle) y almacén (cota original), bajando por la escalera. En la maqueta, la fachada se deja entera cuando se la mira de frente con la cámara baja (para ver la puerta y las ventanas) y se recorta cuando se mira desde arriba.
+En el recorrido se camina por los dos niveles: tarima (a cota de calle) y almacén (cota original), bajando por la escalera. Al altillo del almacén se sube por una escala fija, así que en el recorrido solo se ve desde abajo. En la maqueta, la fachada se deja entera cuando se la mira de frente con la cámara baja (para ver la puerta y las ventanas) y se recorta cuando se mira desde arriba.
 
-La URL guarda la vista (`#propuesta/planta`, `#comparar/recorrido`…), así que se puede mandar un enlace que abra directamente en una vista concreta.
+La URL guarda la vista (`#propuesta/planta`, `#modelo/maqueta`, `#comparar/recorrido`…), así que se puede mandar un enlace que abra directamente en una vista concreta.
 
 ## Uso
 
@@ -22,16 +22,17 @@ npm run dev      # http://localhost:5173
 npm run deploy   # compila y publica en https://giovannibarroso.github.io/local/
 ```
 
-`npm run deploy` sube la web compilada a la rama `gh-pages`, que es la que sirve GitHub Pages. El código fuente va en `master` con un `git push` normal.
+`npm run deploy` sube la web compilada a la rama `gh-pages`, que es la que sirve GitHub Pages. El código fuente va en `master` con un `git push` normal, y cada push a `master` publica la web sola (workflow [publicar.yml](.github/workflows/publicar.yml)), así que `npm run deploy` solo hace falta para publicar a mano.
 
 ## Dónde se cambian las cosas
 
-Todo el modelo sale de dos archivos de datos, en metros:
+Todo sale de tres archivos de datos, en metros:
 
 | Archivo | Contenido |
 | --- | --- |
 | [src/data/local.js](src/data/local.js) | Estado actual: contorno de la planta, altura libre, espesor de muro, huecos (escaparate, puertas), pilares y lo que hay ahora |
-| [src/data/propuesta.js](src/data/propuesta.js) | Reforma: fachada (puerta, ventanas, rejillas, acabado), tarima metálica a la altura de la puerta (salvo los 2,50 m del fondo), almacén al fondo, panelado con el paso a la escalera, escalera recta, aseo, falso techo con 0,40 m para instalaciones y sus elementos (`techo`: LED, aire, emergencias, regletas), mobiliario nuevo (`mobiliario`: cuadro eléctrico, enchufes, sanitarios) y lo que se quita del estado actual (`quitar`). El resto del local se queda como está |
+| [src/data/propuesta.js](src/data/propuesta.js) | Reforma: fachada (puerta, ventanas, rejillas, acabado), tarima metálica a la altura de la puerta (salvo los 2,50 m del fondo), almacén al fondo con altillo a 2,50 m en su mitad izquierda (`altillo`), panelado con el paso a la escalera, trasdosado panelado de las medianeras de la tienda (con los enchufes), escalera recta, aseo con antesala, desagües hasta la bajante (`saneamiento`), falso techo con 0,40 m para instalaciones y sus elementos (`techo`: LED, aire, regletas), mobiliario nuevo (`mobiliario`: cuadro eléctrico, enchufes, luces de emergencia, sanitarios) y lo que se quita del estado actual (`quitar`). El resto del local se queda como está |
+| [src/data/modelo.js](src/data/modelo.js) | Modelo: parte de la propuesta y cambia solo lo que mejora (`notas` es el resumen que sale en la ficha). Lo que la propuesta marca con `grupo: 'aseo'` es lo que el modelo sustituye |
 
 Coordenadas: igual que un plano en papel con la fachada abajo. `x` va hacia la derecha y `y` hacia el fondo, con origen en la esquina interior izquierda de la fachada. El muro `i` va del punto `i` al `i+1` del contorno.
 
@@ -44,8 +45,8 @@ src/
   data/          datos del local y de la propuesta (lo único que hay que tocar)
   escena.js      construye cada escena: suelo, muros con huecos, tabiques, pilares, luces
   carpinteria.js puerta de entrada, ventanas, rejillas y puertas interiores dentro de los huecos
-  instalaciones.js  tiras LED, cassette de aire, luces de emergencia y regletas del falso techo
-  mobiliario.js  elementos sueltos paramétricos (cuadros eléctricos, enchufes, sanitarios, toma de agua…)
+  instalaciones.js  tiras LED, cassette de aire y regletas del techo
+  mobiliario.js  elementos sueltos paramétricos (cuadros eléctricos, enchufes, luces de emergencia, sanitarios, toma de agua…)
   texturas.js    texturas generadas por código (hormigón, ladrillo, bloque, forjado reticular, celosía, paneles)
   materiales.js  acabados del estado actual y de la propuesta
   cotas.js       cotas y rótulos de zonas

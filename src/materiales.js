@@ -42,6 +42,8 @@ export function materialesPropuesta(local, aniso, propuesta) {
   const fachada = conTextura(hormigon({ base: '#c9b69b', manchas: 0.03, poros: false, metros: 2, semilla: 21 }, aniso), 0.9, 0.15)
   const pintado = new THREE.MeshStandardMaterial({ color: '#f2f0ea', roughness: 0.9 })
   const liso = (color, rugosidad = 0.6, metal = 0) => new THREE.MeshStandardMaterial({ color, roughness: rugosidad, metalness: metal })
+  const panel = propuesta?.techo?.panel ?? 0.6
+  const falsoTecho = conTextura(paneles({ color: '#f1efea', ancho: panel, alto: panel, linea: 7, semilla: 9 }, aniso), 0.95, 0.4)
   return {
     ...base,
     // fachada enfoscada y pintada (las dos caras del muro de fachada)
@@ -55,8 +57,9 @@ export function materialesPropuesta(local, aniso, propuesta) {
     acero: liso('#4f5862', 0.45, 0.6),
     panelado: conTextura(paneles({}, aniso), 0.7, 0.6),
     pintado,
-    // falso techo panelado (placas de 60 × 60)
-    falsoTecho: conTextura(paneles({ color: '#f1efea', ancho: propuesta?.techo?.panel ?? 0.6, alto: propuesta?.techo?.panel ?? 0.6, linea: 7, semilla: 9 }, aniso), 0.95, 0.4),
+    // falso techo panelado (placas de 60 × 60) y su versión translúcida para el plano de techo
+    falsoTecho,
+    falsoTechoPlano: Object.assign(falsoTecho.clone(), { transparent: true, opacity: 0.35, depthWrite: false }),
     // carpinterías
     marco: liso('#d9922a', 0.5),
     madera: liso('#a8603c', 0.6),

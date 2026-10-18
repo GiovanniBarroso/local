@@ -138,25 +138,68 @@ function carpinterias(huecos, zInt, zExt, m) {
   return g
 }
 
+// Tubo de radio r que pasa por los puntos (en mundo), con un codo en cada cambio
+// de dirección (y en el arranque, que suele salir de otro tubo).
+function conducto(puntos, r, material) {
+  const g = new THREE.Group()
+  for (let i = 1; i < puntos.length; i++) {
+    const [anterior, siguiente] = [puntos[i - 1], puntos[i]]
+    const tramo = new THREE.Mesh(new THREE.CylinderGeometry(r, r, anterior.distanceTo(siguiente), 16).rotateX(Math.PI / 2), material)
+    tramo.position.lerpVectors(anterior, siguiente, 0.5)
+    tramo.lookAt(siguiente)
+    const codo = new THREE.Mesh(new THREE.SphereGeometry(r * 1.15, 12, 8), material)
+    codo.position.copy(anterior)
+    g.add(tramo, codo)
+  }
+  return sombras(g)
+}
+
 // Bajante vertical con su recorrido colgado del techo.
 function bajante(b, h, m, techo) {
   const pie = aMundo([b.x, b.y])
   const r = 0.055, cota = h - 0.12
   const tubo = new THREE.Mesh(new THREE.CylinderGeometry(r, r, cota, 16).translate(0, cota / 2, 0), m.pvc)
   tubo.position.copy(pie)
-  let anterior = pie.clone().setY(cota)
-  for (const p of b.recorrido ?? []) {
-    const siguiente = aMundo(p, cota)
-    const largo = anterior.distanceTo(siguiente)
-    const tramo = new THREE.Mesh(new THREE.CylinderGeometry(r, r, largo, 16).rotateX(Math.PI / 2), m.pvc)
-    tramo.position.lerpVectors(anterior, siguiente, 0.5)
-    tramo.lookAt(siguiente)
-    const codo = new THREE.Mesh(new THREE.SphereGeometry(r * 1.15, 12, 8), m.pvc)
-    codo.position.copy(anterior)
-    techo.add(sombras(tramo), sombras(codo))
-    anterior = siguiente
-  }
+  if (b.recorrido?.length) techo.add(conducto([pie.clone().setY(cota), ...b.recorrido.map((p) => aMundo(p, cota))], r, m.pvc))
   return sombras(tubo)
+}
+
+// Desagüe: tubo por los puntos [x, y, cota]; con "injerto", el último punto está en una
+// bajante y se marca la pieza de acometida (un manguito sobre la bajante).
+function desague({ puntos, diametro = 0.11, injerto }, m) {
+  const r = diametro / 2
+  const vertices = puntos.map(([x, y, cota]) => aMundo([x, y], cota))
+  const g = conducto(vertices, r, m.pvc)
+  if (injerto) {
+    const manguito = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.24, 16), m.pvc)
+    manguito.position.copy(vertices.at(-1))
+    g.add(sombras(manguito))
+  }
+  return g
+}
+
+// Barandilla metálica recta apoyada a una cota: montantes, pasamanos y travesaño.
+function barandilla(linea, cota, m) {
+  const g = new THREE.Group()
+  for (const dh of [0.95, 0.5]) g.add(conducto(linea.map((p) => aMundo(p, cota + dh)), 0.02, m.acero))
+  for (let i = 0; i < linea.length - 1; i++) {
+    const [a, b] = [linea[i], linea[i + 1]]
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 1.0))
+    for (let j = i ? 1 : 0; j <= n; j++) {
+      const p = [a[0] + ((b[0] - a[0]) * j) / n, a[1] + ((b[1] - a[1]) * j) / n]
+      g.add(conducto([aMundo(p, cota), aMundo(p, cota + 0.95)], 0.018, m.acero))
+    }
+  }
+  return g
+}
+
+// Escala fija de acero para subir al altillo: dos largueros que sobresalen 1 m por
+// encima del forjado (para agarrarse al salir) y peldaños cada 28 cm.
+function escala({ x, y, ancho = 0.45 }, cota, m) {
+  const y0 = y - ancho / 2, y1 = y + ancho / 2
+  const piezas = [y0, y1].map((yl) => prismaPlanta([x - 0.025, x + 0.025], [yl - 0.02, yl + 0.02], [0, cota + 1]))
+  for (let h = 0.28; h < cota - 0.1; h += 0.28) piezas.push(prismaPlanta([x - 0.015, x + 0.015], [y0, y1], [h - 0.015, h + 0.015]))
+  return sombras(new THREE.Mesh(mergeGeometries(piezas), m.acero))
 }
 
 // Losa con la forma de la planta, de y = 0 a y = espesor.
@@ -197,10 +240,11 @@ function repartir(a, b, maximo) {
 }
 
 // Estructura de acero bajo una tarima: pilares con placa de anclaje, vigas
-// paralelas a la fachada y viguetas hacia el fondo. Encima, tablero + acabado (6 cm).
-function estructuraTarima({ cota, poligono, separacionPilares = 2.2, separacionViguetas = 0.6 }, local, m) {
+// paralelas a la fachada (de canto "cantoViga") y viguetas hacia el fondo.
+// Encima, tablero + acabado (6 cm).
+function estructuraTarima({ cota, poligono, separacionPilares = 2.2, separacionViguetas = 0.6, cantoViga = 0.16 }, local, m) {
   const { minX, minY, maxX, maxY } = limites(poligono)
-  const topVigueta = cota - 0.06, topViga = topVigueta - 0.12, pieViga = topViga - 0.16
+  const topVigueta = cota - 0.06, topViga = topVigueta - 0.12, pieViga = topViga - cantoViga
   const piezas = []
   const filas = repartir(minY + 0.2, maxY - 0.2, separacionPilares)
   const columnas = repartir(minX + 0.35, maxX - 0.35, separacionPilares)
@@ -372,15 +416,14 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     placas.position.y = ft
     placas.castShadow = placas.receiveShadow = true
     techo.add(placas)
-    // instalaciones colgadas del falso techo, y el plano de techo (reflejado) para
-    // leerlas desde arriba: una placa a la cota del falso techo con los elementos encima
+    // instalaciones colgadas del falso techo y el plano de techo para leerlas desde
+    // arriba: el falso techo translúcido con los elementos debajo, en su sitio
     if (propuesta.techo) {
       const inst = construirInstalaciones(propuesta.techo, ft, m)
       techo.add(inst.colgado, inst.luces)
-      const placa = losa(local.planta, 0.02, m.falsoTecho)
-      placa.position.y = ft - 0.02
-      placa.receiveShadow = true
-      planoTecho.add(placa, inst.reflejado)
+      const placa = losa(local.planta, 0.02, m.falsoTechoPlano)
+      placa.position.y = ft
+      planoTecho.add(placa, inst.volteados)
     }
   }
 
@@ -403,6 +446,24 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
       obstaculos.push(...esc.obstaculos)
     }
   }
+
+  // Altillo en el almacén: forjado metálico con su estructura, barandilla y escala o
+  // escalera. No es suelo para el recorrido (no cabe una persona de pie bajo el falso
+  // techo): todo cuenta como obstáculo.
+  if (propuesta?.altillo) {
+    const a = propuesta.altillo
+    const forjadoAltillo = sombras(losa(a.poligono, 0.06, m.tablero))
+    forjadoAltillo.position.y = a.cota - 0.06
+    const piezas = [estructuraTarima(a, local, m), forjadoAltillo]
+    if (a.barandilla) piezas.push(barandilla(a.barandilla, a.cota, m))
+    if (a.escala) piezas.push(escala(a.escala, a.cota, m))
+    if (a.escalera) piezas.push(construirEscalera(a.escalera, a.cota, local, m).objeto)
+    escena.add(...piezas)
+    obstaculos.push(...piezas)
+  }
+
+  // Saneamiento bajo la tarima (se ve con «Estructura» o bajando al almacén)
+  for (const d of propuesta?.saneamiento ?? []) escena.add(desague(d, m))
 
   // Muros perimetrales (el muro va por fuera del contorno interior)
   for (const muro of muros(local)) {

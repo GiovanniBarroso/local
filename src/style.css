@@ -118,6 +118,21 @@ dt {
   color: var(--tinta-suave);
 }
 
+/* Mejoras del modelo, bajo los datos de la ficha */
+#mejoras {
+  max-width: 260px;
+  margin: 10px 0 0;
+  padding: 10px 0 0 16px;
+  border-top: 1px solid var(--borde);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--tinta-suave);
+}
+
+#mejoras li + li {
+  margin-top: 4px;
+}
+
 dd {
   margin: 0;
   font-variant-numeric: tabular-nums;
@@ -363,6 +378,17 @@ button:disabled {
 
   .separador {
     margin: 4px 2px;
+  }
+
+  /* en pantallas estrechas las herramientas pasan a dos filas */
+  .herramientas {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: calc(100vw - 24px);
+  }
+
+  .herramientas .separador {
+    display: none;
   }
 
   .lado {
