@@ -5,6 +5,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { aMundo, muros, limites, dentro, enRect, falsoTecho, cotaEn } from './geometria.js'
 import { materialesActual, materialesPropuesta } from './materiales.js'
 import { crearMueble, DEL_TECHO, SIN_COLISION } from './mobiliario.js'
+import { carpinteria, puertaInterior } from './carpinteria.js'
+import { construirInstalaciones } from './instalaciones.js'
 
 const SECCION = 1.1 // corte de la vista en planta, sobre el suelo principal
 const ZOCALO = 0.2 // lo que asoma un muro recortado en la maqueta, sobre la acera
@@ -110,18 +112,30 @@ function celosias(huecos, zc, m) {
   return sombras(g)
 }
 
-// Acabados distintos sobre la cara interior del muro (ladrillo rojo, enfoscado, zunchos).
-// zInt es la cara interior del muro y s el sentido hacia el interior del local.
-function parches(lista, zInt, s, m) {
+// Acabados distintos sobre la cara interior del muro (ladrillo rojo, enfoscado, zunchos)
+// o, con cara: 'exterior', sobre la cara exterior.
+// zInt y zExt son las caras del muro y s el sentido hacia el interior del local.
+function parches(lista, zInt, zExt, s, m) {
   const g = new THREE.Group()
   for (const p of lista) {
     const material = m.acabados?.[p.acabado]
     if (!material) continue
     const e = p.saliente ?? 0.006
-    const [za, zb] = s > 0 ? [zInt, zInt + e] : [zInt - e, zInt]
+    const [za, zb] =
+      p.cara === 'exterior' ? (s > 0 ? [zExt - e, zExt] : [zExt, zExt + e]) : s > 0 ? [zInt, zInt + e] : [zInt - e, zInt]
     g.add(new THREE.Mesh(prisma(p.desde, p.hasta, p.de, p.a, za, zb), material))
   }
   return sombras(g)
+}
+
+// Carpinterías (puerta, ventanas, rejillas) dentro de los huecos de un muro.
+function carpinterias(huecos, zInt, zExt, m) {
+  const g = new THREE.Group()
+  for (const o of huecos) {
+    const c = carpinteria(o, zInt, zExt, m)
+    if (c) g.add(c)
+  }
+  return g
 }
 
 // Bajante vertical con su recorrido colgado del techo.
@@ -226,7 +240,7 @@ function trazaEscalera(e) {
 
 // Altura de la línea de peldaños en un punto (para apoyar la barandilla).
 function alturaEscalera(e, cota, p) {
-  if (enRect(p, e.rellano)) return cota
+  if (e.rellano && enRect(p, e.rellano)) return cota
   if (!enRect(p, e.tramo)) return 0
   const { recorrido, avance } = trazaEscalera(e)
   return cota * (1 - THREE.MathUtils.clamp(avance(p) / recorrido, 0, 1))
@@ -256,12 +270,15 @@ function construirEscalera(e, cota, local, m) {
     tramo.add(zanca)
   }
 
-  // Meseta: tarima pequeña con su estructura
-  const [[rx0, ry0], [rx1, ry1]] = e.rellano
-  const poligonoRellano = [[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1]]
-  const rellano = losa(poligonoRellano, 0.06, m.tablero)
-  rellano.position.y = cota - 0.06
-  g.add(estructuraTarima({ cota, poligono: poligonoRellano, separacionPilares: 1.2 }, local, m))
+  // Meseta (opcional): tarima pequeña con su estructura
+  let rellano = null
+  if (e.rellano) {
+    const [[rx0, ry0], [rx1, ry1]] = e.rellano
+    const poligonoRellano = [[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1]]
+    rellano = sombras(losa(poligonoRellano, 0.06, m.tablero))
+    rellano.position.y = cota - 0.06
+    g.add(estructuraTarima({ cota, poligono: poligonoRellano, separacionPilares: 1.2 }, local, m))
+  }
 
   // Barandilla metálica siguiendo la escalera: montantes, pasamanos y travesaño
   const obstaculos = []
@@ -307,7 +324,7 @@ function construirEscalera(e, cota, local, m) {
     obstaculos.push(pano)
   }
   sombras(tramo)
-  return { objeto: g, rellano: sombras(rellano), peldanos, obstaculos }
+  return { objeto: g, rellano, peldanos, obstaculos }
 }
 
 export function construirEscena({ local, propuesta = null, entorno, aniso }) {
@@ -315,18 +332,25 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
   escena.environment = entorno
   escena.environmentIntensity = 0.45
   // la propuesta conserva los acabados actuales; solo añade lo nuevo
-  const m = propuesta ? materialesPropuesta(local, aniso) : materialesActual(local, aniso)
+  const m = propuesta ? materialesPropuesta(local, aniso, propuesta) : materialesActual(local, aniso)
   const h = local.alturaLibre
   const ft = propuesta ? falsoTecho(local, propuesta) : null
   const cotaPrincipal = propuesta?.tarima?.cota ?? 0 // suelo sobre el que se corta la planta
   const corteSeccion = cotaPrincipal + SECCION
   const corteZocalo = (local.cotaCalle ?? 0) + ZOCALO
   const techo = new THREE.Group() // se oculta en maqueta y planta
+  const planoTecho = new THREE.Group() // plano de techo: solo en maqueta y planta, a petición
   const sobreTarima = new THREE.Group() // se oculta para ver la estructura
   const suelos = [] // superficies pisables (para el recorrido)
   const obstaculos = []
   const paredes = []
-  escena.add(techo, sobreTarima)
+  escena.add(techo, planoTecho, sobreTarima)
+  planoTecho.visible = false
+
+  // Huecos: la propuesta puede sustituir los de un muro (la fachada)
+  const murosNuevos = new Set((propuesta?.fachada?.huecos ?? []).map((o) => o.muro))
+  const huecosTodos = [...local.huecos.filter((o) => !murosNuevos.has(o.muro)), ...(propuesta?.fachada?.huecos ?? [])]
+  const parchesTodos = [...(local.parches ?? []), ...(propuesta?.fachada?.parches ?? [])]
 
   // Terreno exterior, solera y forjado
   escena.add(terreno(local, m.exterior))
@@ -348,6 +372,16 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     placas.position.y = ft
     placas.castShadow = placas.receiveShadow = true
     techo.add(placas)
+    // instalaciones colgadas del falso techo, y el plano de techo (reflejado) para
+    // leerlas desde arriba: una placa a la cota del falso techo con los elementos encima
+    if (propuesta.techo) {
+      const inst = construirInstalaciones(propuesta.techo, ft, m)
+      techo.add(inst.colgado, inst.luces)
+      const placa = losa(local.planta, 0.02, m.falsoTecho)
+      placa.position.y = ft - 0.02
+      placa.receiveShadow = true
+      planoTecho.add(placa, inst.reflejado)
+    }
   }
 
   // Tarima elevada con su estructura, y escalera al nivel original
@@ -361,8 +395,11 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     if (propuesta.escalera) {
       const esc = construirEscalera(propuesta.escalera, t.cota, local, m)
       escena.add(esc.objeto)
-      sobreTarima.add(esc.rellano)
-      suelos.push(esc.rellano, ...esc.peldanos)
+      if (esc.rellano) {
+        sobreTarima.add(esc.rellano)
+        suelos.push(esc.rellano)
+      }
+      suelos.push(...esc.peldanos)
       obstaculos.push(...esc.obstaculos)
     }
   }
@@ -370,15 +407,17 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
   // Muros perimetrales (el muro va por fuera del contorno interior)
   for (const muro of muros(local)) {
     const t = muro.t
-    const huecos = local.huecos.filter((o) => o.muro === muro.i)
+    const huecos = huecosTodos.filter((o) => o.muro === muro.i)
     const lado = Math.sign(
       // ¿la z local del muro apunta al exterior?
       muro.dir[1] * muro.normal[0] - muro.dir[0] * muro.normal[1],
     )
     const [z0, z1] = lado > 0 ? [0, t] : [-t, 0]
+    const [zInt, zExt] = lado > 0 ? [z0, z1] : [z1, z0]
     const extras = new THREE.Group()
     extras.add(celosias(huecos, (z0 + z1) / 2, m))
-    extras.add(parches((local.parches ?? []).filter((p) => p.muro === muro.i), lado > 0 ? z0 : z1, -lado, m))
+    extras.add(parches(parchesTodos.filter((p) => p.muro === muro.i), zInt, zExt, -lado, m))
+    extras.add(sombras(carpinterias(huecos, zInt, zExt, m)))
     const pared = construirMuro({
       L: muro.L + muro.extension,
       h,
@@ -396,7 +435,9 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     obstaculos.push(pared.colision)
     const n = new THREE.Vector3(muro.normal[0], 0, -muro.normal[1])
     const centro = aMundo([muro.a[0] + (muro.dir[0] * muro.L) / 2, muro.a[1] + (muro.dir[1] * muro.L) / 2], h / 2)
-    paredes.push({ ...pared, perimetral: true, normal: n, centro: centro.addScaledVector(n, t / 2) })
+    // la fachada de la propuesta (con carpinterías) solo se recorta mirándola desde arriba
+    const fachada = murosNuevos.has(muro.i)
+    paredes.push({ ...pared, perimetral: true, fachada, normal: n, centro: centro.addScaledVector(n, t / 2) })
   }
 
   for (const b of local.bajantes ?? []) {
@@ -410,14 +451,17 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     const e = tab.espesor ?? 0.1
     const L = Math.hypot(tab.a[0] - tab.de[0], tab.a[1] - tab.de[1])
     const base = tab.cota ?? cotaEn(propuesta, [(tab.de[0] + tab.a[0]) / 2, (tab.de[1] + tab.a[1]) / 2])
+    const extras = new THREE.Group()
+    for (const o of (tab.huecos ?? []).filter((o) => o.puerta)) extras.add(sombras(puertaInterior(o, e, m)))
     const pared = construirMuro({
       L,
       h: ft + 0.04 - base,
       z0: -e / 2,
       z1: e / 2,
       huecos: tab.huecos ?? [],
-      material: tab.acabado === 'panelado' ? m.panelado : m.pared(),
+      material: { panelado: m.panelado, pintado: m.pintado }[tab.acabado] ?? m.pared(),
       poche: m.poche,
+      extras,
       seccion: corteSeccion - base,
       zocalo: corteZocalo - base,
     })
@@ -446,12 +490,16 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     paredes.push({ ...pilar, perimetral: false })
   }
 
-  // Lo que hay ahora en el local (cuadro eléctrico…): sigue en su sitio, sobre la solera
-  for (const def of local.existentes ?? []) {
-    const base = def.cota ?? 0
+  // Lo que hay ahora en el local (cuadro eléctrico…): sigue en su sitio, sobre la solera,
+  // salvo lo que la propuesta quita. Lo nuevo de la propuesta se apoya en el suelo que le toca.
+  const quitar = new Set(propuesta?.quitar ?? [])
+  const existentes = (local.existentes ?? []).filter((d) => !quitar.has(d.tipo)).map((d) => ({ ...d, cota: d.cota ?? 0 }))
+  const nuevos = (propuesta?.mobiliario ?? []).map((d) => ({ ...d, cota: d.cota ?? cotaEn(propuesta, [d.x, d.y]) }))
+  for (const def of [...existentes, ...nuevos]) {
+    const base = def.cota
     const objeto = sombras(crearMueble(def, { techo: (ft ?? h) - base }))
     objeto.position.y = base
-    ;(DEL_TECHO.has(def.tipo) ? techo : escena).add(objeto)
+    ;(DEL_TECHO.has(def.tipo) ? techo : base > 0 ? sobreTarima : escena).add(objeto)
     if (!SIN_COLISION.has(def.tipo)) obstaculos.push(objeto)
   }
 
@@ -486,16 +534,20 @@ export function construirEscena({ local, propuesta = null, entorno, aniso }) {
     obstaculos,
     // Recorta la geometría según la vista: en maqueta se quita el techo y se bajan
     // los muros que tapan la cámara; en planta todo se corta por el plano de sección.
-    aplicarVista(vista, camara, { estructura = false } = {}) {
+    aplicarVista(vista, camara, { estructura = false, techo: verTecho = false } = {}) {
       techo.visible = vista === 'recorrido'
+      planoTecho.visible = verTecho && vista !== 'recorrido'
       sobreTarima.visible = !(estructura && vista !== 'recorrido')
       sol.position.copy(vista === 'planta' ? posicionSol.planta : posicionSol.perspectiva)
       for (const p of paredes) {
         if (vista === 'planta') p.setModo('seccion')
         else if (vista === 'recorrido' || !p.perimetral) p.setModo('completo')
         else {
-          const delante = camara.position.clone().sub(p.centro).dot(p.normal) > 0
-          p.setModo(delante ? 'zocalo' : 'completo')
+          const hacia = camara.position.clone().sub(p.centro)
+          const delante = hacia.dot(p.normal) > 0
+          // la fachada se deja entera si se la mira de frente (cámara baja)
+          const elevacion = Math.atan2(hacia.y, Math.hypot(hacia.x, hacia.z))
+          p.setModo(delante && !(p.fachada && elevacion < 0.6) ? 'zocalo' : 'completo')
         }
       }
     },

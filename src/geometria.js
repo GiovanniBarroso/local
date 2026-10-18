@@ -127,7 +127,7 @@ export const enRect = ([x, y], [[x0, y0], [x1, y1]]) =>
 export function cotaEn(p, punto) {
   if (!p?.tarima) return 0
   if (dentro(punto, p.tarima.poligono)) return p.tarima.cota
-  if (p.escalera && enRect(punto, p.escalera.rellano)) return p.tarima.cota
+  if (p.escalera?.rellano && enRect(punto, p.escalera.rellano)) return p.tarima.cota
   return 0
 }
 

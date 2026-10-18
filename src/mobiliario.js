@@ -198,6 +198,41 @@ const tipos = {
     )
   },
 
+  // cuadro eléctrico nuevo: armario blanco de superficie con puerta, maneta y etiqueta
+  cuadroNuevo({ altura = 1.15, ancho = 0.5, alto = 0.7 }) {
+    return grupo(
+      malla(caja(ancho, alto, 0.11, 0, altura, -0.055), mat('#f1f1ee', 0.4)),
+      malla(caja(ancho - 0.04, alto - 0.04, 0.008, 0, altura + 0.02, 0.004), mat('#e4e4e0', 0.35)),
+      malla(caja(0.012, 0.1, 0.012, ancho / 2 - 0.05, altura + alto / 2 - 0.05, 0.012), mat('#2b2b2b', 0.5, 0.4)),
+      malla(caja(0.16, 0.05, 0.002, 0, altura + alto - 0.12, 0.009), mat('#2d6cb5', 0.5)),
+    )
+  },
+
+  // enchufe doble de superficie: placa con dos bases
+  enchufe({ altura = 0.3 }) {
+    const yc = altura + 0.042
+    const bases = [-0.038, 0.038].map((dx) => new THREE.CylinderGeometry(0.028, 0.028, 0.006, 24).rotateX(Math.PI / 2).translate(dx, yc, 0.009))
+    const agujeros = [-0.038, 0.038].flatMap((dx) =>
+      [-0.0095, 0.0095].map((ox) => new THREE.CylinderGeometry(0.0025, 0.0025, 0.004, 8).rotateX(Math.PI / 2).translate(dx + ox, yc, 0.012)),
+    )
+    return grupo(
+      malla(caja(0.154, 0.084, 0.012, 0, altura, 0.006), mat('#f4f4f1', 0.45)),
+      malla(bases, mat('#e6e6e2', 0.5)),
+      malla(agujeros, mat('#333333', 0.8)),
+    )
+  },
+
+  // toma de agua: llave de paso sobre la pared con su tubo
+  tomaAgua({ altura = 0.5 }) {
+    const metal = mat('#c9c9c9', 0.25, 1)
+    return grupo(
+      malla(cilindro(0.012, 0.012, altura + 0.05, 0, 0, 0.03, 10), metal),
+      malla(new THREE.CylinderGeometry(0.014, 0.014, 0.1, 12).rotateX(Math.PI / 2).translate(0, altura + 0.05, 0.06), metal),
+      malla(new THREE.TorusGeometry(0.028, 0.006, 8, 20).translate(0, altura + 0.085, 0.085), mat('#2d6cb5', 0.5)),
+      malla(cilindro(0.006, 0.006, 0.03, 0, altura + 0.055, 0.085, 8), metal),
+    )
+  },
+
   bombilla(_, { techo }) {
     return grupo(
       new THREE.Mesh(cilindro(0.005, 0.005, 0.6, 0, techo - 0.6, 0, 6), mat(METAL)),
@@ -235,7 +270,7 @@ function objetosEnBaldas(ancho, fondo, alturas, e, semilla) {
 
 // Lo que se cuelga del techo: se oculta junto con él en maqueta y planta.
 export const DEL_TECHO = new Set(['colgante', 'bombilla'])
-export const SIN_COLISION = new Set(['alfombra', 'colgante', 'bombilla'])
+export const SIN_COLISION = new Set(['alfombra', 'colgante', 'bombilla', 'enchufe', 'tomaAgua', 'cuadroNuevo'])
 
 export function crearMueble(def, contexto) {
   const constructor = tipos[def.tipo]

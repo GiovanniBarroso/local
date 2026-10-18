@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js'
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { local } from './data/local.js'
 import { propuesta } from './data/propuesta.js'
 import { construirEscena } from './escena.js'
@@ -25,6 +26,7 @@ const estado = {
   vista: VISTAS.includes(vistaHash) ? vistaHash : 'maqueta',
   cotas: true,
   estructura: false, // ocultar tarima y muebles para ver el acero
+  techo: false, // plano de techo (LED, aire, emergencias) en maqueta y planta
   corte: 0.5,
 }
 
@@ -43,6 +45,7 @@ const etiquetas = new CSS2DRenderer()
 etiquetas.domElement.className = 'etiquetas'
 visor.append(etiquetas.domElement)
 
+RectAreaLightUniformsLib.init() // las tiras LED son luces de área
 const entorno = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture
 const aniso = Math.min(8, renderer.capabilities.getMaxAnisotropy())
 const escenas = {
@@ -96,7 +99,7 @@ const recorrido = new Recorrido(camRecorrido, renderer.domElement, {
 const camaras = { maqueta: camMaqueta, planta: camPlanta, recorrido: camRecorrido }
 
 // acceso para pruebas automáticas; no llega al build de producción
-if (import.meta.env.DEV) window.visor = { recorrido, camRecorrido, estado }
+if (import.meta.env.DEV) window.visor = { recorrido, camRecorrido, estado, orbita, THREE }
 
 function encuadrarMaqueta() {
   const vfov = THREE.MathUtils.degToRad(camMaqueta.fov)
@@ -178,6 +181,8 @@ function aplicar() {
   $('#btn-cotas').disabled = vista === 'recorrido'
   $('#btn-estructura').setAttribute('aria-pressed', estado.estructura)
   $('#btn-estructura').disabled = vista === 'recorrido' || modo === 'actual' || !propuesta.tarima
+  $('#btn-techo').setAttribute('aria-pressed', estado.techo)
+  $('#btn-techo').disabled = vista === 'recorrido' || modo === 'actual' || !propuesta.techo
   comparador.hidden = modo !== 'comparar'
   cotas.visible = estado.cotas && vista !== 'recorrido'
   zonas.visible = cotas.visible && modo !== 'actual'
@@ -204,6 +209,7 @@ botonesVista.forEach((b) =>
 )
 $('#btn-cotas').addEventListener('click', () => ((estado.cotas = !estado.cotas), aplicar()))
 $('#btn-estructura').addEventListener('click', () => ((estado.estructura = !estado.estructura), aplicar()))
+$('#btn-techo').addEventListener('click', () => ((estado.techo = !estado.techo), aplicar()))
 $('#btn-captura').addEventListener('click', capturar)
 
 // Divisor del comparador
@@ -231,7 +237,7 @@ function pintarEscena(e, camara, x, ancho) {
 
 function dibujar() {
   const camara = camaras[estado.vista]
-  for (const e of Object.values(escenas)) e.aplicarVista(estado.vista, camara, { estructura: estado.estructura })
+  for (const e of Object.values(escenas)) e.aplicarVista(estado.vista, camara, { estructura: estado.estructura, techo: estado.techo })
   actualizarCotas(cotas, estado.vista, camara)
   actualizarZonas(zonas, estado.modo === 'comparar' ? estado.corte : 0, camara)
   renderer.setScissorTest(true)

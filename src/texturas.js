@@ -208,7 +208,7 @@ export function celosia(aniso) {
 }
 
 // Paneles lisos con sus juntas (por defecto 1,20 × 2,40 m).
-export function paneles({ color = '#d9d4ca', ancho = 1.2, alto = 2.4, semilla = 8 }, aniso) {
+export function paneles({ color = '#d9d4ca', ancho = 1.2, alto = 2.4, linea = 3, semilla = 8 }, aniso) {
   const [c, ctx] = lienzo(), [cr, rctx] = lienzo(), r = azar(semilla)
   ctx.fillStyle = color
   ctx.fillRect(0, 0, TAM, TAM)
@@ -216,8 +216,8 @@ export function paneles({ color = '#d9d4ca', ancho = 1.2, alto = 2.4, semilla = 
   rctx.fillRect(0, 0, TAM, TAM)
   for (const [cc, tono] of [[ctx, 'rgba(60, 55, 48, 0.45)'], [rctx, '#000']]) {
     cc.fillStyle = tono
-    cc.fillRect(0, 0, 3, TAM)
-    cc.fillRect(0, 0, TAM, 3)
+    cc.fillRect(0, 0, linea, TAM)
+    cc.fillRect(0, 0, TAM, linea)
   }
   ruido(ctx, 6, r)
   return { mapa: textura(c, [ancho, alto], true, aniso), relieve: textura(cr, [ancho, alto], false, aniso) }
