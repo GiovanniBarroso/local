@@ -233,6 +233,17 @@ const tipos = {
     )
   },
 
+  // luz de emergencia de pared: carcasa blanca, difusor encendido y rótulo de salida
+  emergencia({ altura = 2.3 }) {
+    const luz = new THREE.MeshBasicMaterial({ color: '#eafff1', toneMapped: false })
+    return grupo(
+      malla(caja(0.33, 0.12, 0.07, 0, altura, 0.035), mat('#f4f4f2', 0.5)),
+      malla(caja(0.29, 0.012, 0.05, 0, altura - 0.006, 0.035), luz),
+      malla(caja(0.2, 0.06, 0.004, 0, altura + 0.03, 0.071), mat('#2f9e5a', 0.5)),
+      malla(caja(0.05, 0.03, 0.002, -0.06, altura + 0.045, 0.074), luz),
+    )
+  },
+
   bombilla(_, { techo }) {
     return grupo(
       new THREE.Mesh(cilindro(0.005, 0.005, 0.6, 0, techo - 0.6, 0, 6), mat(METAL)),
@@ -270,7 +281,7 @@ function objetosEnBaldas(ancho, fondo, alturas, e, semilla) {
 
 // Lo que se cuelga del techo: se oculta junto con él en maqueta y planta.
 export const DEL_TECHO = new Set(['colgante', 'bombilla'])
-export const SIN_COLISION = new Set(['alfombra', 'colgante', 'bombilla', 'enchufe', 'tomaAgua', 'cuadroNuevo'])
+export const SIN_COLISION = new Set(['alfombra', 'colgante', 'bombilla', 'enchufe', 'tomaAgua', 'cuadroNuevo', 'emergencia'])
 
 export function crearMueble(def, contexto) {
   const constructor = tipos[def.tipo]

@@ -1,6 +1,7 @@
-// Instalaciones del falso techo: tiras LED empotradas, cassette de aire acondicionado,
-// luces de emergencia y regletas. Se construyen colgando del plano del falso techo
-// (y = ft es la cara vista) y, para el plano de techo, se vuelven a montar reflejadas.
+// Instalaciones del techo: tiras LED empotradas, cassette de aire acondicionado y
+// regletas. Se construyen colgando del plano del falso techo (y = ft es la cara vista)
+// o, las regletas con "cota", de otro techo (bajo el altillo). Para el plano de techo
+// se vuelven a montar volteadas en su sitio, para leer su cara inferior desde arriba.
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js'
 import { aMundo } from './geometria.js'
@@ -56,21 +57,9 @@ function cassette({ x, y, lado = 0.84 }, ft, m) {
   return g
 }
 
-// Luz de emergencia: bloque blanco con difusor verde en la base.
-function emergencia({ x, y, rot = 0 }, ft, m) {
-  const g = new THREE.Group()
-  const c = aMundo([x, y])
-  g.position.set(c.x, 0, c.z)
-  g.rotation.y = THREE.MathUtils.degToRad(rot)
-  g.add(malla(caja(0.33, 0.06, 0.12, 0, ft - 0.03, 0), m.blanco))
-  g.add(malla(caja(0.28, 0.006, 0.07, 0, ft - 0.062, 0), emisivo('#8ff0b0'), false))
-  g.add(malla(caja(0.22, 0.03, 0.004, 0, ft - 0.03, 0.062), emisivo('#8ff0b0'), false))
-  g.add(malla(caja(0.22, 0.03, 0.004, 0, ft - 0.03, -0.062), emisivo('#8ff0b0'), false))
-  return g
-}
-
-// Regleta estanca (almacén).
-function regleta({ x, y, largo = 1.2, rot = 0 }, ft, m) {
+// Regleta estanca (almacén), colgada del falso techo o a la cota que se indique.
+function regleta({ x, y, largo = 1.2, rot = 0, cota }, ft, m) {
+  ft = cota ?? ft
   const g = new THREE.Group()
   const c = aMundo([x, y])
   g.position.set(c.x, 0, c.z)
@@ -82,9 +71,19 @@ function regleta({ x, y, largo = 1.2, rot = 0 }, ft, m) {
   return { objeto: g, luz }
 }
 
-// Monta las instalaciones del techo. Devuelve los elementos colgados, sus luces y una
-// copia reflejada sobre el plano del falso techo para leerlas desde arriba
-// (plano de techo en la maqueta y en la planta).
+// Copia de un elemento volteada sobre sí misma: ocupa el mismo sitio, bajo su techo,
+// pero enseña hacia arriba la cara que mira al suelo.
+function volteado(objeto) {
+  const { min, max } = new THREE.Box3().setFromObject(objeto)
+  const copia = objeto.clone()
+  copia.scale.y = -1
+  copia.position.y = min.y + max.y
+  return copia
+}
+
+// Monta las instalaciones del techo. Devuelve los elementos colgados, sus luces y el
+// plano de techo (maqueta y planta): los mismos elementos volteados en su sitio, para
+// verlos desde arriba a través del falso techo como se verían desde abajo.
 export function construirInstalaciones(techo, ft, m) {
   const colgado = new THREE.Group(), luces = new THREE.Group()
   if (techo.led) {
@@ -93,14 +92,12 @@ export function construirInstalaciones(techo, ft, m) {
     luces.add(t.luces)
   }
   for (const a of techo.aire ?? []) colgado.add(cassette(a, ft, m))
-  for (const e of techo.emergencias ?? []) colgado.add(emergencia(e, ft, m))
   for (const r of techo.regletas ?? []) {
     const reg = regleta(r, ft, m)
     colgado.add(reg.objeto)
     luces.add(reg.luz)
   }
-  const reflejado = colgado.clone()
-  reflejado.scale.y = -1
-  reflejado.position.y = 2 * ft
-  return { colgado, luces, reflejado }
+  const volteados = new THREE.Group()
+  for (const o of colgado.children) volteados.add(volteado(o))
+  return { colgado, luces, volteados }
 }

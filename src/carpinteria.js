@@ -118,19 +118,22 @@ export function rejilla(o, zInt, zExt, m) {
 }
 
 // Puerta interior: cerco y hoja lisa abatida hacia dentro ("abierta" en grados).
-// El tabique es simétrico (z de -e/2 a e/2); la hoja gira sobre la jamba izquierda.
+// El tabique es simétrico (z de -e/2 a e/2); la hoja gira sobre la jamba izquierda
+// o, con bisagra: 'derecha', sobre la derecha (mirando el tabique desde su arranque).
 export function puertaInterior(o, e, m, abierta = 80) {
   const g = new THREE.Group()
   const x0 = o.desde, x1 = o.desde + o.ancho, y0 = o.antepecho ?? 0, y1 = y0 + o.alto
   const a = 0.04
   g.add(malla([...marco(x0, x1, y0 - 0.001, y1, a, -e / 2 - 0.01, e / 2 + 0.01)].slice(0, 3), m.cerco))
+  const lado = o.bisagra === 'derecha' ? -1 : 1 // hacia dónde va la hoja desde la bisagra
   const hoja = new THREE.Group()
-  hoja.position.set(x0 + a, 0, 0)
+  hoja.position.set(lado > 0 ? x0 + a : x1 - a, 0, 0)
   const ancho = x1 - x0 - 2 * a - 0.01, alto = y1 - y0 - a - 0.01
-  hoja.add(malla(caja(0, ancho, y0 + 0.01, y0 + 0.01 + alto, -0.02, 0.02), m.hoja))
-  hoja.add(malla(new THREE.CylinderGeometry(0.01, 0.01, 0.12, 10).rotateZ(Math.PI / 2).translate(ancho - 0.1, y0 + 1.05, 0.03), m.laton))
-  hoja.add(malla(new THREE.CylinderGeometry(0.01, 0.01, 0.12, 10).rotateZ(Math.PI / 2).translate(ancho - 0.1, y0 + 1.05, -0.03), m.laton))
-  hoja.rotation.y = THREE.MathUtils.degToRad(abierta)
+  hoja.add(malla(caja(0, lado * ancho, y0 + 0.01, y0 + 0.01 + alto, -0.02, 0.02), m.hoja))
+  for (const z of [0.03, -0.03]) {
+    hoja.add(malla(new THREE.CylinderGeometry(0.01, 0.01, 0.12, 10).rotateZ(Math.PI / 2).translate(lado * (ancho - 0.1), y0 + 1.05, z), m.laton))
+  }
+  hoja.rotation.y = lado * THREE.MathUtils.degToRad(abierta)
   g.add(hoja)
   return g
 }

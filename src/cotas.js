@@ -61,7 +61,7 @@ const nivel = (c) => (c > 0 ? `+${formato(c)}` : c < 0 ? `−${formato(-c)}` : '
 export function construirZonas(propuesta) {
   const grupo = new THREE.Group()
   for (const z of propuesta?.zonas ?? []) {
-    const centro = centroide(z.poligono), cota = cotaEn(propuesta, centro)
+    const centro = z.rotulo ?? centroide(z.poligono), cota = z.cota ?? cotaEn(propuesta, centro)
     const html = `<strong>${z.nombre}</strong><span>${formato(area(z.poligono))} m² · ${nivel(cota)}</span>`
     grupo.add(etiqueta('zona', html, aMundo(centro, cota + 0.05)))
   }

@@ -26,7 +26,7 @@ const estado = {
   vista: VISTAS.includes(vistaHash) ? vistaHash : 'maqueta',
   cotas: true,
   estructura: false, // ocultar tarima y muebles para ver el acero
-  techo: false, // plano de techo (LED, aire, emergencias) en maqueta y planta
+  techo: false, // plano de techo (LED, aire, regletas) en maqueta y planta
   corte: 0.5,
 }
 
